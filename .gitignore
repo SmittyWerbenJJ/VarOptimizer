@@ -1,0 +1,5 @@
+.pytest_cache/
+build/
+dist/
+/**/__pycache__/
+/tests/data/tmp*

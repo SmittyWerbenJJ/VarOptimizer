@@ -1,0 +1,18 @@
+{
+    "python.linting.enabled": true,
+    "python.linting.pycodestyleCategorySeverity.E": "Information",
+    "python.linting.pycodestyleArgs": ["--ignore=E501"],
+    "python.testing.unittestArgs": [
+        "-v",
+        "-s",
+        "./tests",
+        "-p",
+        "test_*.py"
+    ],
+    "python.testing.unittestEnabled": true,
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": true
+    },
+    "python.linting.pycodestyleEnabled": true
+}
