@@ -1,9 +1,7 @@
 {
     "python.linting.enabled": true,
     "python.linting.pycodestyleCategorySeverity.E": "Information",
-    "python.linting.pycodestyleArgs": [
-        "--ignore=E501"
-    ],
+    "python.linting.pycodestyleArgs": ["--ignore=E501"],
     "python.testing.unittestArgs": [
         "-v",
         "-s",
@@ -16,28 +14,5 @@
     "editor.codeActionsOnSave": {
         "source.organizeImports": true
     },
-    "python.linting.pycodestyleEnabled": true,
-    "taskExplorer.exclude": [
-        "**/.vscode-test/**",
-        "**/bin/**",
-        "**/build/**",
-        "**/CompiledOutput/**",
-        "**/dist/**",
-        "**/doc/**",
-        "**/ext/**",
-        "**/out/**",
-        "**/output/**",
-        "**/packages/**",
-        "**/release/**",
-        "**/releases/**",
-        "**/samples/**",
-        "**/sdks/**",
-        "**/static/**",
-        "**/target/**",
-        "**/test/**",
-        "**/third_party/**",
-        "**/vendor/**",
-        "**/work/**",
-        "/c:/Users/Smitty/SoftwareProjects/VarOptimizer/.env/Lib/venv/scripts/common/Activate.ps1"
-    ]
+    "python.linting.pycodestyleEnabled": true
 }

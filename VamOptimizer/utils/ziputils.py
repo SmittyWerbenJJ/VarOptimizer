@@ -52,10 +52,8 @@ class ZipUtils:
     @staticmethod
     def renameArchiveToVar(archivePath: Path, varfile: Path, errorQueue: multiprocessing.Queue):
         try:
-            new_path = archivePath.with_name(varfile.name)
-            if os.path.exists(new_path):
-                os.remove(new_path)
-            archivePath.rename(new_path)
+            new_name = archivePath.with_name(varfile.name)
+            archivePath.rename(new_name)
         except Exception as e:
             errorQueue.put(
                 f"Error Renaming Archive to Var - [{archivePath.name}]\n->{str(e)}")

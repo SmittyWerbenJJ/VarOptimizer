@@ -1,4 +1,0 @@
-from varoptimizer.App import main
-
-if __name__ == '__main__':
-    main()

@@ -2,14 +2,13 @@ from pathlib import Path
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
-from PyQt5 import QtCore, QtGui
-import signal
 
 # The fondamental for working with python
 
-from .Widgets import ui_mainWindow
-from .eventHook import EventHook
-from .optimizer import OptimizerArgs
+import signal
+from Widgets import *
+from eventHook import EventHook
+from optimizer import OptimizerArgs
 
 
 class MainWindow(QMainWindow):
@@ -23,7 +22,7 @@ class MainWindow(QMainWindow):
     onRestoreBackupToggled = QtCore.pyqtSignal(int)
     onRecursiveToggled = QtCore.pyqtSignal(int)
 
-    def __init__(self,iconPath=None, parent=None):
+    def __init__(self, parent=None):
         # Qt signal when asynchronous processing is interrupted
 
         # Create settings for the software
@@ -32,7 +31,7 @@ class MainWindow(QMainWindow):
         self.settings.setFallbacksEnabled(False)
         self.version = "0.0.1"
 
-        self.ui = ui_mainWindow.Ui_MainWindow()
+        self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
 
         self.constructUI()
@@ -40,9 +39,6 @@ class MainWindow(QMainWindow):
 
         # When the software are closed on console the software are closed
         signal.signal(signal.SIGINT, signal.SIG_DFL)
-        if iconPath is not None:
-            self.setWindowIcon(QtGui.QIcon(iconPath))
-
 
     def constructUI(self):
 

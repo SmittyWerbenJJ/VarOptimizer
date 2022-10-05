@@ -1,15 +1,19 @@
 
 import argparse
 import sys
+import time
+import asyncio
 import multiprocessing
-import PyQt5
 from PyQt5.QtCore import *
 from PyQt5.QtCore import QObject, QThread, pyqtSignal
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 
-from .uiController import UiController
-from .Widgets import *
+
+from uiController import UiController
+from Widgets import *
+from progressDialog import ProgressDialog
+from mainWindow import MainWindow
 
 
 def parseArgs():
@@ -33,10 +37,14 @@ def parseArgs():
 
 
 def main():
-    multiprocessing.freeze_support()
     # MainWindow_ = MainWindow()
     app = QApplication(sys.argv)
     controller = UiController()
     controller.showMainWindow()
 
     sys.exit(app.exec())
+
+
+if __name__ == '__main__':
+    multiprocessing.freeze_support()
+    main()
