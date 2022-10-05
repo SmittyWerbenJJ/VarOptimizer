@@ -1,0 +1,23 @@
+{
+    "configurations": [
+        {
+            "name": "Python: VamOptimizer",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/runme.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "Python: Debug Tests",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "purpose": [
+                "debug-test"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        }
+    ]
+}

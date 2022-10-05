@@ -1,9 +1,9 @@
+from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
-
-from eventHook import EventHook
-from Widgets import *
+from .eventHook import EventHook
+from .Widgets import ui_ProgressDialog
 
 
 class ProgressDialog(QDialog):
@@ -31,12 +31,12 @@ class ProgressDialog(QDialog):
     # misc
     resetAllProgressbars = QtCore.pyqtSignal()
     writeTextLine = QtCore.pyqtSignal(str)
-    clearTextBox=QtCore.pyqtSignal()
+    clearTextBox = QtCore.pyqtSignal()
     onCancel = QtCore.pyqtSignal()
 
-    def __init__(self, parent=None):
+    def __init__(self,iconPath=None, parent=None):
         super().__init__(parent)
-        self.ui = Ui_DialogProgress()
+        self.ui = ui_ProgressDialog.Ui_DialogProgress()
         self.ui.setupUi(self)
         self.ConnectSlots()
         self.initUI()
@@ -44,6 +44,9 @@ class ProgressDialog(QDialog):
         self.totalProgress = 0
         self.taskProgress = 0
         self.log = []
+
+        if iconPath is not None:
+            self.setWindowIcon(QtGui.QIcon(iconPath))
 
     def closeEvent(self, a0: QtGui.QCloseEvent) -> None:
         self.onCancel.emit()
@@ -77,7 +80,6 @@ class ProgressDialog(QDialog):
         self.updateTaskProgress.connect(self.updateTaskProgress_DONTCALL)
         self.setTaskProgresssDescription.connect(
             self.setTaskDescription_DONTCALL)
-
 
         self.writeTextLine.connect(self.postError_DONTCALL)
         self.clearTextBox.connect(self.clearTextBox_DONTCALL)

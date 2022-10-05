@@ -45,13 +45,13 @@ from tkinter import N
 from uuid import uuid1
 from zipfile import ZipFile, ZipInfo
 
-from eventHook import EventHook
-from progressDialog import ProgressDialog
-from utils.fileUtils import FileUtils
-from utils.imageUtils import Image, ImageUtils
-from utils.ziputils import ZipUtils
-from vamOptimizerUtils import *
-from vamOptimizerUtils import ArchiveInfo
+from .eventHook import EventHook
+from .progressDialog import ProgressDialog
+from .utils.fileUtils import FileUtils
+from .utils.imageUtils import Image, ImageUtils
+from .utils.ziputils import ZipUtils
+from .vamOptimizerUtils import *
+from .vamOptimizerUtils import ArchiveInfo
 
 
 class Optimizer:
@@ -68,7 +68,7 @@ class Optimizer:
         self.progressdialog: ProgressDialog = args.progressDialog
         self.initProgressBarOnStartup(self.progressdialog)
         varFiles: list[Path] = FileUtils.get_all_files_in_dir_by_extension(
-            inputdir, ".var",recursive=args.recursive)
+            inputdir, ".var", recursive=args.recursive)
 
         # init vars
         CPUCores = max(1, os.cpu_count()-1)
@@ -199,7 +199,7 @@ class Optimizer:
         self.progressdialog.setTotalProgressDescription.emit(
             "Done ...")
 
-        self.progressdialog.writeTextLine(
+        self.progressdialog.writeTextLine.emit(
             "Finished with "+str(self.encounteredErrors)+" Errors")
 
     def setupTask2(self, archiveInfos: list[ArchiveInfo]) -> list[AsyncResult]:
@@ -333,12 +333,30 @@ class Optimizer:
     def backupVarFile(varfile: Path, errorQueue: multiprocessing.Queue):
         try:
             varpathSTR = str(varfile)
-            if not os.path.exists(varpathSTR):
+
+            varPath = varfile
+            backupPath = Path(varpathSTR+ArchiveInfo.VARBACKUPSUFFIX)
+
+            backupMessagePrefix = "Error Backing up Var File:"
+
+            if not os.path.exists(str(varPath)):
                 time.sleep(1)
-            varfile.rename(str(varfile)+ArchiveInfo.VARBACKUPSUFFIX)
+
+            if not os.path.exists(str(varPath)):
+                raise Exception(
+                    f"{backupMessagePrefix} The VarFile does not exist anymore - [{str(varPath)}]"
+                )
+            if os.path.exists(str(backupPath)):
+                #backupfile already exists, delete backup file
+                os.remove(backupPath)
+
+            os.rename(str(varfile),str(backupPath))
+        except FileExistsError as e:
+            x=1
         except Exception as e:
             errorQueue.put(
                 f"Error Backing up Var File: [{varfile.name}]\n->{str(e)}")
+
 
     def killAllProcesses(self):
         if self.processPool is not None:

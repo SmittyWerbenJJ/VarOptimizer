@@ -1,15 +1,16 @@
-from enum import Enum
 import io
-from pathlib import Path
 from dataclasses import dataclass
-from uuid import uuid4
-from multipledispatch import dispatch
+from enum import Enum
 from multiprocessing import Queue
+from pathlib import Path
+from uuid import uuid4
+from zipfile import ZipInfo
+
+from multipledispatch import dispatch
 from PyQt5.QtCore import QObject, pyqtSignal
 
-from zipfile import ZipInfo
-from utils.ziputils import *
-from utils.imageUtils import *
+from .utils.imageUtils import *
+from .utils.ziputils import *
 
 
 class UiCallbackHandler(QObject):
@@ -48,7 +49,7 @@ class ArchiveInfo:
     metafileSuffixes = [".json", ".vap", ".vaj", ".vam"]
     TEMPVAREXTENSION = ".tempvar"
     VARBACKUPSUFFIX = ".backup"
-
+    ImageSuffixList= [".png",".tiff",".tga"]
     def __init__(self, archivePath: Path, imageConvertOption: ImgConvertOption = None):
         self.filelist: list[ZipInfo] = []
         self.metaFiles: list[ZipInfo] = []
@@ -86,7 +87,7 @@ class ArchiveInfo:
 
         # self.genereateImageToBeConvertedList()
         self.imgFiles = ZipUtils.filter_zip_info_list_by_suffix(
-            self.filelist, [".png"])
+            self.filelist, self.ImageSuffixList)
 
         # self.generateOtherFilesFilelist()
         allRecognizedItems = self.metaFiles + self.jpgFiles + self.imgFiles

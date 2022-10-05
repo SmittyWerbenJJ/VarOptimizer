@@ -9,12 +9,11 @@ class FileUtils:
         hits: list[Path] = []
         dirsToSearch = []
 
+        dirsToSearch = [dir]
         if recursive == True:
             for root, dirs, _ in os.walk(str(dir)):
                 for subDir in dirs:
                     dirsToSearch.append(Path(os.path.join(root, subDir)))
-        else:
-            dirsToSearch = [dir]
 
         for searchDir in dirsToSearch:
             for file in searchDir.iterdir():

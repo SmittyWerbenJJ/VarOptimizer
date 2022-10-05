@@ -6,13 +6,14 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 
-from eventHook import EventHook
-from mainWindow import MainWindow
-from optimizer import Optimizer
-from progressDialog import ProgressDialog
-from vamOptimizerUtils import *
-from Widgets import *
-from Widgets import Ui_MainWindow
+from .eventHook import EventHook
+from .mainWindow import MainWindow
+from .optimizer import Optimizer
+from .progressDialog import ProgressDialog
+from .vamOptimizerUtils import *
+
+# from .Widgets import *
+# from .Widgets.ui_mainWindow import Ui_MainWindow
 
 
 class ThreadWorker(QObject):
@@ -44,6 +45,11 @@ class UiController(QObject):
     progress = pyqtSignal(int)
     backGroundThread: QThread
     backgroundworker = ThreadWorker()
+    # FIXME: Does Not work on packaged Application. need to find a fix for that
+    iconPathh = str(
+        Path(__file__).parent.parent.parent.joinpath(
+            "img\\icon.ico").resolve().absolute()
+    )
 
     def __init__(self, ):
         super(UiController, self).__init__()
@@ -52,8 +58,8 @@ class UiController(QObject):
         self.onProgressUpdate = EventHook()
         self.optimizerArgs = OptimizerArgs()
 
-        self.mainWindow = MainWindow()
-        self.progressWindow = ProgressDialog()
+        self.mainWindow = MainWindow(iconPath=self.iconPathh)
+        self.progressWindow = ProgressDialog(iconPath=self.iconPathh)
 
         self.initMainWindow()
         self.initProgressWindow()
