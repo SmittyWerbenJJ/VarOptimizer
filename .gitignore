@@ -4,4 +4,4 @@ build/
 dist/
 /tests/data/tmp*
 .env/
-test/files/*
+test/files*/*
