@@ -20,7 +20,7 @@ class MainWindow(QMainWindow):
     onResizeImageToggled = QtCore.pyqtSignal(int)
     onResizeImageResChanged = QtCore.pyqtSignal(int)
     onOptimizeButtonClicked = QtCore.pyqtSignal()
-    onRestoreBackupToggled = QtCore.pyqtSignal(int)
+    onRestoreBackupToggled = QtCore.pyqtSignal(bool)
     onRecursiveToggled = QtCore.pyqtSignal(int)
 
     def __init__(self,iconPath=None, parent=None):
@@ -73,14 +73,15 @@ class MainWindow(QMainWindow):
 
         # hook up the restore backups checkBox
         self.ui.chk_restoreBackups.stateChanged.connect(
-            self.onRestoreButtonToggled)
+            self.onRestoreBackupsToggled)
 
     def onResizeResolutionChanged(self):
         self.onResizeImageResChanged.emit(
             int(self.ui.cmb_resizeImg.currentText()))
 
-    def onRestoreButtonToggled(self):
-        self.onRestoreBackupToggled.emit(self.getImageResizeCheckState())
+    def onRestoreBackupsToggled(self):
+        checked =self.ui.chk_restoreBackups.isChecked()
+        self.onRestoreBackupToggled.emit(checked)
 
     def ConnectSlots(self):
         self.setResizeResolution.connect(self.setResizeResolution_DONTCALL)
@@ -99,8 +100,10 @@ class MainWindow(QMainWindow):
         self.ui.cmb_resizeImg.setCurrentIndex(AllItems[value])
 
     def getImageResizeCheckState(self):
-        state = self.ui.chk_restoreBackups.checkState()
-        return True if state == 2 else False
+        return self.ui.chk_resizeImg.isChecked()
+
+    def getRestoreBackupsCheckState(self):
+        return self.ui.chk_restoreBackups.isChecked()
 
     def getAllCurrentValues(self):
         ui = self.ui
@@ -111,7 +114,8 @@ class MainWindow(QMainWindow):
         )
         args.optimizerOptions.resizeDimensions = int(
             ui.cmb_resizeImg.currentText())
-        args.restoreBackupVars = self.getImageResizeCheckState()
+        args.restoreBackupVars = self.getRestoreBackupsCheckState()
+        
         return args
 
     def setInputFolderText(self, txt):

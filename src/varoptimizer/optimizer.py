@@ -146,9 +146,9 @@ class Optimizer:
 
         self.updateTotalProgressbyOne()
 
-        # task6 Renaming var files to backup
+        # task6 Renaming var files to backup, if restoreBackus is enabled
 
-        task6 = self.setupTask6(archiveInfos, chunksize)
+        task6 = self.setupTask6(archiveInfos, chunksize, args.restoreBackupVars)
 
         for task in task6:
             if task.get():
@@ -275,15 +275,25 @@ class Optimizer:
 
         return res
 
-    def setupTask6(self, archiveInfos: list[ArchiveInfo], chunksize: int):
+    def setupTask6(self, archiveInfos: list[ArchiveInfo], chunksize: int,restoreBackups:bool):
         res = []
         for archInf in archiveInfos:
-            res.append(Optimizer.processPool.starmap_async(
-                Optimizer.backupVarFile,
-                [(archInf.archivePath, self.errorQueue)], chunksize=chunksize
-            ))
-        self.setUiNewTaskStatus(calcProgressBarMaxInt(
-            res), "Backung Up Original Vars  ...")
+            if restoreBackups is True:
+                res.append(Optimizer.processPool.starmap_async(
+                    Optimizer.backupVarFile,
+                    [(archInf.archivePath, self.errorQueue)], chunksize=chunksize
+                ))
+            else:
+                res.append(Optimizer.processPool.starmap_async(
+                    Optimizer.replaceVarFileWithTempVar,
+                    [(archInf.archivePath, self.errorQueue)], chunksize=chunksize
+                ))
+        if restoreBackups is True:
+            self.setUiNewTaskStatus(calcProgressBarMaxInt(
+                res), "Backung Up Original Vars  ...")
+        else:
+            self.setUiNewTaskStatus(calcProgressBarMaxInt(
+                res), "Replacing Var Files ...")
         return res
 
     def initProgressBarOnStartup(self, progressdialog: ProgressDialog):
@@ -356,6 +366,32 @@ class Optimizer:
         except Exception as e:
             errorQueue.put(
                 f"Error Backing up Var File: [{varfile.name}]\n->{str(e)}")
+
+    @ staticmethod
+    def replaceVarFileWithTempVar(varfile:Path, errorQueue:multiprocessing.Queue):
+        try:
+            varPath = varfile
+            varpathSTR = str(varfile)
+            backupPath = Path(varpathSTR+".tempvar")
+
+            backupMessagePrefix = "Error Replacing Var File:"
+
+            if not os.path.exists(str(varPath)):
+                time.sleep(1)
+
+            if not os.path.exists(str(varPath)):
+                raise Exception(
+                    f"{backupMessagePrefix} The VarFile does not exist anymore - [{str(varPath)}]"
+                )
+
+            if os.path.exists(varpathSTR) and os.path.exists(str(backupPath)):
+                #varfile and tempfile exists, delete varfile and remove suffix from tempvar
+                os.remove(varpathSTR)
+                # backupPath.rename(backupPath.with_suffix(""))
+
+        except Exception as e:
+            errorQueue.put(
+                f"Error Replacing varfile with tempvar: [{varfile.name}] \n-> [{backupPath.name}]\n->{str(e)}")
 
 
     def killAllProcesses(self):
