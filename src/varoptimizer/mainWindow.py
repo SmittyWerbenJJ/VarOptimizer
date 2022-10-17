@@ -1,15 +1,12 @@
-from pathlib import Path
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from PyQt5.QtWidgets import *
-from PyQt5 import QtCore, QtGui
 import signal
+from pathlib import Path
 
-# The fondamental for working with python
+from PyQt5 import QtCore, QtGui
+from PyQt5.QtCore import QSettings, Qt
+from PyQt5.QtWidgets import QMainWindow
 
+from .optimizerArgs import OptimizerArgs
 from .Widgets import ui_mainWindow
-from .eventHook import EventHook
-from .optimizer import OptimizerArgs
 
 
 class MainWindow(QMainWindow):
@@ -23,7 +20,7 @@ class MainWindow(QMainWindow):
     onRestoreBackupToggled = QtCore.pyqtSignal(bool)
     onRecursiveToggled = QtCore.pyqtSignal(int)
 
-    def __init__(self,iconPath=None, parent=None):
+    def __init__(self, iconPath=None, parent=None):
         # Qt signal when asynchronous processing is interrupted
 
         # Create settings for the software
@@ -43,44 +40,38 @@ class MainWindow(QMainWindow):
         if iconPath is not None:
             self.setWindowIcon(QtGui.QIcon(iconPath))
 
-
     def constructUI(self):
 
         # Set the MainWindow Title
         self.setWindowTitle("VarOptimizer - " + self.version)
 
         # hook up input folder text box
-        self.ui.input_folder.textChanged.connect(
-            self.onInputDirTextChanged.emit)
+        self.ui.input_folder.textChanged.connect(self.onInputDirTextChanged.emit)
 
-        self.ui.btn_SelectFolder.clicked.connect(
-            self.onOpenFolderDialogClicked.emit)
+        self.ui.btn_SelectFolder.clicked.connect(self.onOpenFolderDialogClicked.emit)
 
         # hook up resize image toggle
-        self.ui.chk_resizeImg.stateChanged.connect(
-            self.onResizeImageToggled.emit)
+        self.ui.chk_resizeImg.stateChanged.connect(self.onResizeImageToggled.emit)
 
         # hook up recursive Checkbox
-        self.ui.chk_recursive.stateChanged.connect(
-            self.onRecursiveToggled.emit)
+        self.ui.chk_recursive.stateChanged.connect(self.onRecursiveToggled.emit)
 
         # hook up resize image combo box
         self.ui.cmb_resizeImg.currentIndexChanged.connect(
-            self.onResizeResolutionChanged)
+            self.onResizeResolutionChanged
+        )
 
         # hook up optimize button
         self.ui.btn_Optimize.clicked.connect(self.onOptimizeButtonClicked.emit)
 
         # hook up the restore backups checkBox
-        self.ui.chk_restoreBackups.stateChanged.connect(
-            self.onRestoreBackupsToggled)
+        self.ui.chk_restoreBackups.stateChanged.connect(self.onRestoreBackupsToggled)
 
     def onResizeResolutionChanged(self):
-        self.onResizeImageResChanged.emit(
-            int(self.ui.cmb_resizeImg.currentText()))
+        self.onResizeImageResChanged.emit(int(self.ui.cmb_resizeImg.currentText()))
 
     def onRestoreBackupsToggled(self):
-        checked =self.ui.chk_restoreBackups.isChecked()
+        checked = self.ui.chk_restoreBackups.isChecked()
         self.onRestoreBackupToggled.emit(checked)
 
     def ConnectSlots(self):
@@ -112,10 +103,9 @@ class MainWindow(QMainWindow):
         args.optimizerOptions.resize = (
             True if ui.chk_resizeImg.checkState == Qt.Checked else False
         )
-        args.optimizerOptions.resizeDimensions = int(
-            ui.cmb_resizeImg.currentText())
+        args.optimizerOptions.resizeDimensions = int(ui.cmb_resizeImg.currentText())
         args.restoreBackupVars = self.getRestoreBackupsCheckState()
-        
+
         return args
 
     def setInputFolderText(self, txt):

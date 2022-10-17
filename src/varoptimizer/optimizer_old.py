@@ -1,5 +1,3 @@
-
-
 """
 Tool optimize textures within var files
 
@@ -29,29 +27,30 @@ show size difference
 """
 
 
-from concurrent.futures import process
+import argparse
+import io
 import json
 import multiprocessing
-from concurrent import futures
-from multiprocessing import context
-from multiprocessing.pool import Pool
-import queue
-from random import Random
-import shutil
-from subprocess import call
 import os
-from mpire import WorkerPool
-import argparse
-from pathlib import Path
-from shutil import rmtree
+import queue
+import shutil
 import threading
 import time
+import zipfile
+from concurrent import futures
+from concurrent.futures import process
+from multiprocessing import context
+from multiprocessing.pool import Pool
+from pathlib import Path
+from random import Random
+from shutil import rmtree
+from subprocess import call
 from unittest import result
 from zipfile import ZipFile, ZipInfo
-import zipfile
-from PIL import Image, ImageOps
-import io
+
 import tqdm
+from mpire import WorkerPool
+from PIL import Image, ImageOps
 
 
 def getAllFilesInDirByExtension(dir: str, extension=".zip", asString=False):
@@ -102,10 +101,7 @@ def nya(tupl):
 
 def parseArgs():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "dir",
-        help="The Directory to scan"
-    )
+    parser.add_argument("dir", help="The Directory to scan")
     parser.add_argument(
         "-r",
         help="Recursive Scan: Scall all subfolders",
@@ -114,7 +110,7 @@ def parseArgs():
     parser.add_argument(
         "--resize",
         help="resizes the images: This number will be the max width/height of the image and preserves the Aspect Ratio",
-        type=int
+        type=int,
     )
     args = parser.parse_args()
     return args
@@ -133,7 +129,8 @@ class ImageConvertTask:
 
     def run(self):
         Optimizer.convertArchivedImagetoTiff(
-            self.archivePath, self.imagePath, self.outdir, self.ImageSize)
+            self.archivePath, self.imagePath, self.outdir, self.ImageSize
+        )
 
     def asDict(self):
         dd = {
@@ -141,7 +138,7 @@ class ImageConvertTask:
             "imagePath": str(self.imagePath),
             "outdir": str(self.outdir),
             "ImageSize": self.ImageSize,
-            "callback": self.callback
+            "callback": self.callback,
         }
         return dd
 
@@ -152,10 +149,22 @@ class ImageConvertTask:
 
     def asMultiThreadTask(self):
         dd = self.asDict()
-        return ImageConvertTask(dd["archive"], dd["imagePath"], dd["outdir"], dd["ImageSize"], dd["callback"])
+        return ImageConvertTask(
+            dd["archive"],
+            dd["imagePath"],
+            dd["outdir"],
+            dd["ImageSize"],
+            dd["callback"],
+        )
 
 
-def iterdir2(dir: Path, asString=False, returnFullpath=True, recursive=False, returnRelativeToDir:Path = None):
+def iterdir2(
+    dir: Path,
+    asString=False,
+    returnFullpath=True,
+    recursive=False,
+    returnRelativeToDir: Path = None,
+):
     x = []
     if recursive:
         for root, dirs, files in os.walk(dir):
@@ -188,7 +197,6 @@ class OptimiserArgs:
 
 
 class Optim:
-
     def launch(varfile, arg: OptimiserArgs):
         try:
             exec = Optim(varfile, arg)
@@ -199,7 +207,7 @@ class Optim:
     def __init__(self, varfile: Path, arg: OptimiserArgs) -> None:
         self.arg = arg
         self.varfile = varfile
-        tempdir = self.extractArchive(varfile, Path(str(varfile)+"_tempdir"))
+        tempdir = self.extractArchive(varfile, Path(str(varfile) + "_tempdir"))
         imagePaths = self.getAllImagesInSubfolders(tempdir)
         metaPaths = self.getallMetaFilesInSubfolders(tempdir)
         self.convertAllPNGImageToTiff(imagePaths)
@@ -213,7 +221,7 @@ class Optim:
         shutil.rmtree(folderToDelete)
 
     def backupVarFile(self, varfile: Path):
-        varfile.rename(str(varfile)+".backup")
+        varfile.rename(str(varfile) + ".backup")
 
     def renameArchiveToVar(self, archive: Path):
         archive.rename(self.varfile)
@@ -227,17 +235,21 @@ class Optim:
         return extractPath
 
     def getAllImagesInSubfolders(self, folder) -> list[Path]:
-        files = iterdir2(folder, asString=False,
-                         returnFullpath=True, recursive=True)
-        images = [file for file in files if file.suffix.lower() in [
-            ".jpg", ".png", ".tiff", ".jpeg"]]
+        files = iterdir2(folder, asString=False, returnFullpath=True, recursive=True)
+        images = [
+            file
+            for file in files
+            if file.suffix.lower() in [".jpg", ".png", ".tiff", ".jpeg"]
+        ]
         return images
 
     def getallMetaFilesInSubfolders(self, folder) -> list[Path]:
-        files = iterdir2(folder, asString=False,
-                         returnFullpath=True, recursive=True)
-        metafiles = [file for file in files if file.suffix.lower() in [
-            ".json", ".vap", ".vaj", ".vam"]]
+        files = iterdir2(folder, asString=False, returnFullpath=True, recursive=True)
+        metafiles = [
+            file
+            for file in files
+            if file.suffix.lower() in [".json", ".vap", ".vaj", ".vam"]
+        ]
         return metafiles
 
     def convertAllPNGImageToTiff(self, imagePaths: list[Path]):
@@ -269,9 +281,12 @@ class Optim:
             parentFolder = folder.parent
 
             zipOutFullPath = parentFolder.joinpath(
-                varFile.with_suffix(varFile.suffix+".tempzip"))
+                varFile.with_suffix(varFile.suffix + ".tempzip")
+            )
             dirToZip = str(folder.joinpath("**"))
-            sevenZipCommand = f"{SevenZipExepath} {zipargs} \"{str(zipOutFullPath)}\" \"{dirToZip}\""
+            sevenZipCommand = (
+                f'{SevenZipExepath} {zipargs} "{str(zipOutFullPath)}" "{dirToZip}"'
+            )
             if zipOutFullPath in iterdir2(parentFolder):
                 os.remove(zipOutFullPath)
             result = call(sevenZipCommand)
@@ -279,7 +294,7 @@ class Optim:
                 raise Exception(result)
             return Path(zipOutFullPath)
         except Exception as e:
-            raise Exception("ERROR WHILE ZIPPING UP FILE:"+str(e))
+            raise Exception("ERROR WHILE ZIPPING UP FILE:" + str(e))
 
 
 class Optimizer:
@@ -305,8 +320,7 @@ class Optimizer:
             originalVarFile = Path(backupFile).with_suffix("").__str__()
             if originalVarFile in allFilesInDir:
                 os.remove(originalVarFile)
-            Path(backupFile).rename(
-                Path(backupFile).with_suffix("").__str__())
+            Path(backupFile).rename(Path(backupFile).with_suffix("").__str__())
 
         return [Path(x) for x in getAllFilesInDirByExtension(dir, ".var")]
 
@@ -325,7 +339,7 @@ class Optimizer:
 
             return ImageOps.contain(image, (newImageSize, newImageSize))
         except Exception as e:
-            raise Exception("ERROR WHILE RESIZING IMAGE: "+str(e))
+            raise Exception("ERROR WHILE RESIZING IMAGE: " + str(e))
 
     def convertArchivedImagetoTiff(archive, imgSubPath: str, outDir, newImageSize):
         try:
@@ -342,24 +356,25 @@ class Optimizer:
             image = Optimizer.resizeImage(image, newImageSize)
             image.save(finalFileSavePath, compression="jpeg", quality=95)
         except Exception as e:
-            raise Exception("ERROR WHILE CONVERTING IMAGE TO TIFF: "+str(e))
+            raise Exception("ERROR WHILE CONVERTING IMAGE TO TIFF: " + str(e))
 
     def convertArchivedImagetoTiffFromTask(task: ImageConvertTask):
         try:
             Optimizer.convertArchivedImagetoTiff(
-                task.archivePath, task.imagePath, task.outdir, task.ImageSize)
+                task.archivePath, task.imagePath, task.outdir, task.ImageSize
+            )
             task.callback()
             return "FINISHED"
         except Exception:
             return "CANCELLED"
 
     def convertArchivedImagetoJpeg(archive, imgSubPath: str, outDir):
-        """ Converting to jpeg\n
-            return true if image was converted succesfully
-            return false if image was not converted, because it contains a valid alpha channel
+        """Converting to jpeg\n
+        return true if image was converted succesfully
+        return false if image was not converted, because it contains a valid alpha channel
         """
         try:
-            image = Optimizer. openArchivedBinaryImage(archive, imgSubPath)
+            image = Optimizer.openArchivedBinaryImage(archive, imgSubPath)
             imgPath = Path(imgSubPath)
             print(imgSubPath)
             isAlphaNecessaray = Optimizer.isAlphaChannelNecessary(image)
@@ -379,7 +394,7 @@ class Optimizer:
                 file.write(ramImage.getbuffer())
             return True
         except Exception as e:
-            raise ("ERROR WHILE CONVERTING ARCHIVED IMAGE TO JPG: "+str(e))
+            raise ("ERROR WHILE CONVERTING ARCHIVED IMAGE TO JPG: " + str(e))
 
     def isAlphaChannelNecessary(image: Image.Image):
         if image.mode == "RGB":
@@ -445,10 +460,13 @@ class Optimizer:
             zipargs = "a -tzip -bd -bso0 -m0=DEFLATE"
             parentFolder = folder.parent
 
-            zipOutFullPath = parentFolder.joinpath(
-                varname).with_suffix(Path(varname).suffix+".temp")
+            zipOutFullPath = parentFolder.joinpath(varname).with_suffix(
+                Path(varname).suffix + ".temp"
+            )
             dirToZip = str(folder.joinpath("**"))
-            sevenZipCommand = f"{SevenZipExepath} {zipargs} \"{str(zipOutFullPath)}\" \"{dirToZip}\""
+            sevenZipCommand = (
+                f'{SevenZipExepath} {zipargs} "{str(zipOutFullPath)}" "{dirToZip}"'
+            )
             if zipOutFullPath in iterdir2(parentFolder):
                 os.remove(zipOutFullPath)
             result = call(sevenZipCommand)
@@ -456,11 +474,11 @@ class Optimizer:
                 raise Exception(result)
             return Path(zipOutFullPath)
         except Exception as e:
-            raise Exception("ERROR WHILE ZIPPING UP FILE:"+str(e))
+            raise Exception("ERROR WHILE ZIPPING UP FILE:" + str(e))
 
     def OptimizeVarFile(self, varPath: Path, processPool: Pool):
         try:
-            tempdir = varPath.with_name(varPath.stem+"_tempdir")
+            tempdir = varPath.with_name(varPath.stem + "_tempdir")
             tempdir.mkdir(parents=True, exist_ok=True)
 
             skippedImagesZipPaths: list[ZipInfo] = []
@@ -469,13 +487,12 @@ class Optimizer:
 
             with ZipFile(str(varPath.resolve()), "r") as archive:
                 lenFilelist = len(archive.filelist)
-                pbar = tqdm.tqdm(total=lenFilelist +
-                                 additionalSteps, leave=False)
+                pbar = tqdm.tqdm(total=lenFilelist + additionalSteps, leave=False)
 
                 # extract everything BUT png files
                 pbar.set_description("Reading MetaData ...")
                 for file in archive.filelist:
-                    if Path(file.filename).suffix in [".png",  ".tiff", ".tif"]:
+                    if Path(file.filename).suffix in [".png", ".tiff", ".tif"]:
                         skippedImagesZipPaths.append(file)
                 pbar.update()
 
@@ -495,11 +512,15 @@ class Optimizer:
                 for imagePath in skippedImagesZipPaths:
                     imgConvertTasks.append(
                         ImageConvertTask(
-                            varPath, imagePath.filename, tempdir, self.newImageSize).asMultiThreadTask()
+                            varPath, imagePath.filename, tempdir, self.newImageSize
+                        ).asMultiThreadTask()
                     )
 
                 processPool.map_async(
-                    Optimizer.convertArchivedImagetoTiffFromTask, imgConvertTasks, callback=cockUpdate)
+                    Optimizer.convertArchivedImagetoTiffFromTask,
+                    imgConvertTasks,
+                    callback=cockUpdate,
+                )
 
                 # # oldprogress=pbar.3tal
                 # finished = 0
@@ -515,10 +536,7 @@ class Optimizer:
             # change references for extracted Images in all manifests
             pbar.set_description_str("Updating MetaData ...")
             allFilesInAllSubdirsRelative = iterdir2(
-                tempdir,
-                asString=False,
-                recursive=True,
-                returnRelativeToDir=tempdir
+                tempdir, asString=False, recursive=True, returnRelativeToDir=tempdir
             )
             allFilesInAllSubdirs = iterdir2(
                 tempdir,
@@ -526,11 +544,8 @@ class Optimizer:
                 recursive=True,
             )
 
-            allMetaFiles = [
-                x for x in allFilesInAllSubdirs if isMetaFile(x)]
-            allImageFiles = [
-                x for x in allFilesInAllSubdirsRelative if isImageFile(x)
-            ]
+            allMetaFiles = [x for x in allFilesInAllSubdirs if isMetaFile(x)]
+            allImageFiles = [x for x in allFilesInAllSubdirsRelative if isImageFile(x)]
             tasks = []
 
             for m in allMetaFiles:
@@ -569,8 +584,7 @@ class Optimizer:
 
 def restoreBackupVars(inputdir):
     backupFileSuffix = ".backup"
-    backupFiles = getAllFilesInDirByExtension(
-        inputdir, ".var"+backupFileSuffix)
+    backupFiles = getAllFilesInDirByExtension(inputdir, ".var" + backupFileSuffix)
     varFiles = getAllFilesInDirByExtension(inputdir, ".var")
 
     # restore backups
@@ -578,7 +592,7 @@ def restoreBackupVars(inputdir):
     for backupFile in backupFiles:
         for varfile in varFiles:
             strBackuFile = str(backupFile)
-            if strBackuFile == str(varfile)+backupFileSuffix:
+            if strBackuFile == str(varfile) + backupFileSuffix:
                 validBackups[backupFile] = varfile
 
     for backup, original in validBackups.items():
@@ -590,11 +604,13 @@ def restoreBackupVars(inputdir):
 
 def main():
     # main()
-    title = "\n".join([
-        "=================================",
-        "Smittys Var optimizer",
-        "=================================",
-    ])
+    title = "\n".join(
+        [
+            "=================================",
+            "Smittys Var optimizer",
+            "=================================",
+        ]
+    )
 
     # op = Optimizer()
     # op = Optim()
@@ -612,8 +628,8 @@ def main():
     varFiles = restoreBackupVars(inputdir)
 
     numberOfVars = len(varFiles)
-    preTaskinfo = "Directory: " + str(inputdir)+os.linesep
-    preTaskinfo += "Detected .var files: "+str(numberOfVars) + os.linesep
+    preTaskinfo = "Directory: " + str(inputdir) + os.linesep
+    preTaskinfo += "Detected .var files: " + str(numberOfVars) + os.linesep
 
     print(title)
     print(preTaskinfo)
@@ -621,8 +637,16 @@ def main():
     # launching optimisation task
     with WorkerPool(n_jobs=4, keep_alive=True) as pool:
         args = [[vfile, OptimiserArgs(resize)] for vfile in varFiles]
-        pool.map(Optim.launch, args, progress_bar=True,
-                 progress_bar_options={"desc": "Optimizing...", "unit": "var", "colour": "green"})
+        pool.map(
+            Optim.launch,
+            args,
+            progress_bar=True,
+            progress_bar_options={
+                "desc": "Optimizing...",
+                "unit": "var",
+                "colour": "green",
+            },
+        )
 
     # prog = tqdm.tqdm(total=numberOfVars,postfix=)
     # for vfile in varFiles:
@@ -647,3 +671,130 @@ def main():
 if __name__ == "__main__":
     multiprocessing.freeze_support()
     main()
+
+
+########################################################################
+# originally in: optimizer.py
+
+# def optimizeFolder(self, args: OptimizerArgs):
+#       vF = args.varfile
+# # scan varFile and index the contents
+# if utils.validateVarFile(vF) is None:
+#     Optimizer.postError(f"[{str(vF)}] is not a valid var file!")
+#     return
+
+# tempZip = archiveinfo.createdTempArchive
+
+# # repack-convert metadata
+# print("metadata: " + str(vF))
+# for metafile in archiveinfo.metaFiles:
+#     utils.convertRepackArchivedMetaFile(
+#         archive=zipfile.ZipFile(archiveinfo.archivePath, "r"),
+#         metafilePath=metafile.filename,
+#         targetArchive=archiveinfo.tempZip,
+#         errorQueue=args.errorQueue,
+#     )
+
+# for filepath in varFiles:
+#     self.optimizeVarFile(filepath, args)
+
+# """
+# SC task1: scan all Archive Files and index their Contents
+# """
+# self.setUiNewTaskStatus(1, "Scanning Archives ...")
+# task1 = []
+# archiveInfos: list[ArchiveInfo] = []
+# for vF in varFiles:
+#     try:
+#         archiveInfos.append(
+#             ArchiveInfo(vF, imageConvertOption=args.optimizerOptions)
+#         )
+#     except Exception:
+#         continue
+
+# self.updateTotalProgressbyOne()
+# self.updateTaskbyOne()
+
+# """
+#  multiP-task2 - extracting-Convert MetaData
+# """
+# task2 = self.setupTask2(archiveInfos)
+
+# for task in task2:
+#     if task.get():
+#         self.updateTaskbyOne()
+#     self.printErrorsFromQueue()
+# self.updateTotalProgressbyOne()
+
+# # multiP-task3 - extracting JPG Files
+# task3 = self.setupTask3(archiveInfos)
+
+# for task in task3:
+#     if task.get():
+#         self.updateTaskbyOne()
+#     self.printErrorsFromQueue()
+# self.updateTotalProgressbyOne()
+
+# # multiP-task4 - extract-Converting OtherImageFiles
+# task4 = self.setupTask4(archiveInfos, args)
+
+# for task in task4:
+#     if task.get():
+#         self.updateTaskbyOne()
+#     self.printErrorsFromQueue()
+
+# # multiP-task5 - zipping Archives
+
+# task5 = self.setupTask5(archiveInfos, self.chunksize)
+
+# for task in task5:
+#     if task.get():
+#         self.updateTaskbyOne()
+
+# self.updateTotalProgressbyOne()
+
+# # task6 Renaming var files to backup, if restoreBackus is enabled
+
+# task6 = self.setupTask6(archiveInfos, self.chunksize,
+#                         args.restoreBackupVars)
+
+# for task in task6:
+#     if task.get():
+#         self.updateTaskbyOne()
+#     self.printErrorsFromQueue()
+
+# # task7 renaming zippedArchives to VAR
+# task7 = []
+# for archInf in archiveInfos:
+#     task7.append(self.processPool.starmap_async(
+#         utils.renameArchiveToVar,
+#         [(archInf.createdTempArchive, archInf.archivePath,
+#           self.errorQueue)], chunksize=self.chunksize
+#     ))
+
+# self.setUiNewTaskStatus(utils.calcProgressBarMaxInt(
+#     task7), "Renaming New Files ...")
+
+# for task in task7:
+#     if task.get():
+#         self.updateTaskbyOne()
+#     self.printErrorsFromQueue()
+# self.updateTotalProgressbyOne()
+
+# # task8 deleting temp dirs
+# task8 = []
+# for archInf in archiveInfos:
+#     task8.append(self.processPool.map_async(
+#         shutil.rmtree,
+#         [archInf.tempDir], chunksize=1
+#     ))
+
+# self.setUiNewTaskStatus(utils.calcProgressBarMaxInt(
+#     task8), "Deleting Temp Dirs ...")
+
+# for task in task8:
+#     if task.get():
+#         self.updateTaskbyOne()
+#     self.printErrorsFromQueue()
+# self.updateTotalProgressbyOne()
+################################################################################

@@ -26,198 +26,186 @@ show size difference
 
 """
 
-import argparse
-import chunk
-import io
-import multiprocessing
-import os
+import pickle
 import shutil
-import subprocess
-import time
-import uuid
-from dataclasses import dataclass
-from distutils import filelist
-from io import *
-from multiprocessing.pool import *
-from multiprocessing.pool import AsyncResult
-from pathlib import Path
-from tkinter import N
-from uuid import uuid1
-from zipfile import ZipFile, ZipInfo
+import zipfile
 
-from .eventHook import EventHook
+# from varoptimizer import archiveInfo
+from io import *
+from multiprocessing.pool import AsyncResult, Pool, ThreadPool
+from queue import Queue
+from traceback import format_exc
+
+from pyparsing import Opt
+
+from varoptimizer import archiveInfo
+
+from . import utils
+from .archiveInfo import ArchiveInfo
+from .commonImports import *
+from .optimizerArgs import OptimizerArgs
 from .progressDialog import ProgressDialog
-from .utils.fileUtils import FileUtils
-from .utils.imageUtils import Image, ImageUtils
-from .utils.ziputils import ZipUtils
-from .vamOptimizerUtils import *
-from .vamOptimizerUtils import ArchiveInfo
 
 
 class Optimizer:
+    instance = None
 
     def __init__(self) -> None:
-        self.errorQueue = multiprocessing.Queue()
-        self.progressdialog: ProgressDialog = None
-        self.processPool: Pool = None
-        self.threadPool: ThreadPool = None
+        # multiprocessing stuff
+        self.manager = multiprocessing.Manager()
+
+        self.errorQueue: Queue
+        self.encounteredErrors: int
+        self.progressdialog: ProgressDialog
+        self.optimizer_args: OptimizerArgs
+        Optimizer.instance = self
+
+    def initOptimizer(self, args: "OptimizerArgs"):
+        # self.errorQueue = multiprocessing.Queue()
+        self.errorQueue = self.manager.Queue()
         self.encounteredErrors = 0
+        self.optimizer_args = args
+        self.progressdialog = args.progressDialog
+
+        # initAllCPUS
+        self.CPUCores = max(1, os.cpu_count() - 1)
+        self.processPool = Pool(self.CPUCores)
+        # self.processPool = ThreadPool(self.CPUCores)
+
+    def startOptimisation(self, args: OptimizerArgs):
+        try:
+            """
+            process: we scan the folder for var files (and backups) and check if they are valid zipfiles
+            then we iterate over those var files and execute the chain of commands to optimize those files.
+            the optimisation will take place with all cpu cores. after each run we increase the total counter.
+            within each run we increase a sub-counter
+            """
+            self.initOptimizer(args)
+            self.optimizeFolder(args)
+        except Exception as e:
+            Optimizer.postError("Error While Optimizing:\n" + traceback.format_exc())
 
     def optimizeFolder(self, args: OptimizerArgs):
-        inputdir = args.dir
-        self.progressdialog: ProgressDialog = args.progressDialog
-        self.initProgressBarOnStartup(self.progressdialog)
-        varFiles: list[Path] = FileUtils.get_all_files_in_dir_by_extension(
-            inputdir, ".var", recursive=args.recursive)
-
         # init vars
-        CPUCores = max(1, os.cpu_count()-1)
-        Optimizer.processPool = Pool(CPUCores)
-        manager = multiprocessing.Manager()
-        self.errorQueue = manager.Queue()
-        chunksize = max(1, 1)  # int(len(varFiles)/CPUCores))
-        self.encounteredErrors = 0
+        self.optimizer_args = args
+        self.progressdialog = self.optimizer_args.progressDialog
+        self.chunksize = max(1, 1)  # int(len(varFiles)/CPUCores))
 
-        taskAmount = 8
+        # init ui
+        self.initProgressBarOnStartup(self.progressdialog)
 
-        if args.restoreBackupVars:
-            backups = Optimizer.findBackupVarFiles(inputdir)
-            Optimizer.restoreBackupVars(backups)
+        # get all var files
+        varFiles: list[Path] = utils.get_all_files_in_dir_by_extension(
+            self.optimizer_args.dir, ".var", recursive=self.optimizer_args.recursive
+        )
+
+        # restore backups
+        if self.optimizer_args.restoreBackupVars:
+            backups = []
+            for folderwithbackups in [x.parent for x in varFiles]:
+                bb = self.findBackupVarFiles(folderwithbackups)
+                if len(bb) >= 1:
+                    backups.extend(bb)
+            backups1 = list(set(backups))
+            self.restoreBackupVars(backups1)
+
+        # # validate var files
+        # varFiles = vamOptimizerUtils.validateVarFiles(varFiles)
 
         # resetProgressBars
-        self.progressdialog.setTotalProgressRangeMax.emit(taskAmount)
+        self.progressdialog.setTotalProgressRangeMax.emit(len(varFiles))
+        self.progressdialog.setTaskProgressRangeMax.emit(10)
+        self.progressdialog.setTotalProgress.emit(0)
         self.progressdialog.setTotalProgressDescription.emit(
-            "Optimizing "+str(len(varFiles))+" .Var Files ... ")
+            "Optimizing " + str(len(varFiles)) + " .Var Files ... "
+        )
+        # self.progressdialog.setTaskProgressRangeMax.emit(len(varFiles))
 
-        # SC - SingleCore
-        # MC - MultiCore
-        # MT - MultiThread
-        # archiveFiles: list[ArchiveInfo] = []
+        # asyncTasks = []
+        # for vF in varFiles:
+        #     asyncTask = None
+        #     asyncArgs = utils.ArgsDict(
+        #         varfile=vF,
+        #         dir=self.optimizer_args.dir,
+        #         restoreBackups=self.optimizer_args.restoreBackupVars,
+        #         options=vars(self.optimizer_args.optimizerOptions),
+        #         errorQueue=self.errorQueue,
+        #         processPool=self.processPool,
+        #     )
+        #     asyncTask = self.processPool.starmap_async(
+        #         Optimizer.optimizeVarFile,
+        #         [(asyncArgs,)],
+        #         callback=self.optimizerSuccessCallback,
+        #         error_callback=self.optimizerErrorCallback,
+        #     )
+        #     asyncTasks.append(asyncTask)
 
-        # start
+        # init optimisation tasks
+        # optimize
+        # pendingTasks = len(asyncTasks)
+        # while pendingTasks > 0:
+        #     for task in asyncTasks:
+        #         try:
+        #             if task.get(timeout=1):
+        #                 # self.updateTotalProgressbyOne()
+        #                 pendingTasks -= 1
+        #         except Exception as e:
+        #             continue
 
-        """
-        SC task1: scan all Archive Files and index their Contents
-        """
-        self.setUiNewTaskStatus(1, "Scanning Archives ...")
-        task1 = []
-        archiveInfos: list[ArchiveInfo] = []
-        for vF in varFiles:
-            aInf = ArchiveInfo(vF, imageConvertOption=args.optimizerOptions)
-            archiveInfos.append(aInf)
-        self.updateTotalProgressbyOne()
-        self.updateTaskbyOne()
+        #         self.printErrorsFromQueue()
+        #         # self.updateTaskbyOne()
 
-        """
-         multiP-task2 - extracting-Convert MetaData
-        """
-        task2 = self.setupTask2(archiveInfos)
+        # allvarfiles=[]
 
-        for task in task2:
-            if task.get():
-                self.updateTaskbyOne()
-            self.printErrorsFromQueue()
-        self.updateTotalProgressbyOne()
+        self.setUiNewTaskStatus(5, "...")
+        for i, varfile in enumerate(varFiles):
+            self.setUiNewTaskStatus(4, str(varfile.name) + " ...")
+            archiveinfo = ArchiveInfo(varfile, imageConvertOption=args.optimizerOptions)
 
-        # multiP-task3 - extracting JPG Files
-        task3 = self.setupTask3(archiveInfos)
+            utils.MP_ExtractConvertArchivedMetaFiles(
+                self.processPool, archiveinfo, self.errorQueue
+            )
 
-        for task in task3:
-            if task.get():
-                self.updateTaskbyOne()
-            self.printErrorsFromQueue()
-        self.updateTotalProgressbyOne()
+            self.updateTaskbyOne()
+            utils.MP_ExtractOtherFilesMP(self.processPool, archiveinfo, self.errorQueue)
 
-        # multiP-task4 - extract-Converting OtherImageFiles
-        task4 = self.setupTask4(archiveInfos, args)
+            self.updateTaskbyOne()
+            utils.MP_ExtractConvertImages(
+                self.processPool, archiveinfo, args.optimizerOptions, self.errorQueue
+            )
 
-        for task in task4:
-            if task.get():
-                self.updateTaskbyOne()
-            self.printErrorsFromQueue()
+            self.updateTaskbyOne()
+            utils.create_archive_for_ArchiveInfo(archiveinfo)
 
-        # multiP-task5 - zipping Archives
+            self.updateTaskbyOne()
+            utils.backupVarFile(archiveinfo)
+            utils.finalizeTempVar(archiveinfo)
 
-        task5 = self.setupTask5(archiveInfos, chunksize)
-
-        for task in task5:
-            if task.get():
-                self.updateTaskbyOne()
-
-        self.updateTotalProgressbyOne()
-
-        # task6 Renaming var files to backup, if restoreBackus is enabled
-
-        task6 = self.setupTask6(archiveInfos, chunksize, args.restoreBackupVars)
-
-        for task in task6:
-            if task.get():
-                self.updateTaskbyOne()
-            self.printErrorsFromQueue()
-
-        # task7 renaming zippedArchives to VAR
-        task7 = []
-        for archInf in archiveInfos:
-            task7.append(Optimizer.processPool.starmap_async(
-                ZipUtils.renameArchiveToVar,
-                [(archInf.createdTempArchive, archInf.archivePath,
-                  self.errorQueue)], chunksize=chunksize
-            ))
-
-        self.setUiNewTaskStatus(calcProgressBarMaxInt(
-            task7), "Renaming New Files ...")
-
-        for task in task7:
-            if task.get():
-                self.updateTaskbyOne()
-            self.printErrorsFromQueue()
-        self.updateTotalProgressbyOne()
-
-        # task8 deleting temp dirs
-        task8 = []
-        for archInf in archiveInfos:
-            task8.append(Optimizer.processPool.map_async(
-                shutil.rmtree,
-                [archInf.tempDir], chunksize=1
-            ))
-
-        self.setUiNewTaskStatus(calcProgressBarMaxInt(
-            task8), "Deleting Temp Dirs ...")
-
-        for task in task8:
-            if task.get():
-                self.updateTaskbyOne()
-            self.printErrorsFromQueue()
-        self.updateTotalProgressbyOne()
+            if i + 1 == len(varFiles):
+                shutil.rmtree(archiveinfo.tempDir, ignore_errors=True)
+            self.updateTaskbyOne()
+            self.updateTotalProgressbyOne()
 
         # all tasks finished
-        self.progressdialog.setTotalProgress.emit(taskAmount)
-        self.progressdialog.setTaskProgressRangeMax.emit(1)
-        self.progressdialog.setTaskProgress.emit(1)
-        self.progressdialog.setTaskProgresssDescription.emit(
-            "Done ...")
-        self.progressdialog.setTotalProgressDescription.emit(
-            "Done ...")
+        self.progressdialog.setTaskProgresssDescription.emit("Done ...")
+        self.progressdialog.setTotalProgressDescription.emit("Done ...")
 
         self.progressdialog.writeTextLine.emit(
-            "Finished with "+str(self.encounteredErrors)+" Errors")
+            "Finished with " + str(self.encounteredErrors) + " Errors"
+        )
 
     def setupTask2(self, archiveInfos: list[ArchiveInfo]) -> list[AsyncResult]:
         res: list[AsyncResult] = []
         for archInf in archiveInfos:
             files = [x.filename for x in archInf.metaFiles]
-            args = [
-                (archInf.archivePath,
-                 files,
-                 archInf.tempDir,
-                 self.errorQueue)
-            ]
-            asyncTask = Optimizer.processPool.starmap_async(
-                convertExtractArchivedMetaFile, args
+            args = [(archInf.archivePath, files, archInf.tempDir, self.errorQueue)]
+            asyncTask = self.processPool.starmap_async(
+                utils.ExtractConvertArchivedImage, args
             )
             res.append(asyncTask)
-        self.setUiNewTaskStatus(calcProgressBarMaxInt(
-            res), "extracting-Convert MetaData...")
+        self.setUiNewTaskStatus(
+            utils.utils.calcProgressBarMaxInt(res), "extracting-Convert MetaData..."
+        )
 
         return res
 
@@ -225,41 +213,58 @@ class Optimizer:
         res: list[AsyncResult] = []
         for archInf in archiveInfos:
             task3jpgFiles = [x.filename for x in archInf.jpgFiles]
-            task3argsJPEG = [(archInf.archivePath,
-                              task3jpgFiles,
-                              archInf.tempDir,
-                              self.errorQueue
-                              )]
+            task3argsJPEG = [
+                (archInf.archivePath, task3jpgFiles, archInf.tempDir, self.errorQueue)
+            ]
 
             task3allOtherFiles = [x.filename for x in archInf.allOtherFiles]
-            task3argsOther = [(archInf.archivePath,
-                               task3allOtherFiles,
-                               archInf.tempDir,
-                               self.errorQueue
-                               )]
+            task3argsOther = [
+                (
+                    archInf.archivePath,
+                    task3allOtherFiles,
+                    archInf.tempDir,
+                    self.errorQueue,
+                )
+            ]
 
-            res.append(Optimizer.processPool.starmap_async(
-                ZipUtils.extractFromArchive, task3argsJPEG))
+            res.append(
+                self.processPool.starmap_async(utils.extractFromArchive, task3argsJPEG)
+            )
 
-            res.append(Optimizer.processPool.starmap_async(
-                ZipUtils.extractFromArchive, task3argsOther))
+            res.append(
+                self.processPool.starmap_async(utils.extractFromArchive, task3argsOther)
+            )
 
-        self.setUiNewTaskStatus(calcProgressBarMaxInt(
-            res), "extracting JPG & other Files ...")
+        self.setUiNewTaskStatus(
+            utils.utils.calcProgressBarMaxInt(res), "extracting JPG & other Files ..."
+        )
 
         return res
 
-    def setupTask4(self, archiveInfos: list[ArchiveInfo], args: OptimizerArgs) -> list[AsyncResult]:
+    def setupTask4(
+        self, archiveInfos: list[ArchiveInfo], args: OptimizerArgs
+    ) -> list[AsyncResult]:
         res: list[AsyncResult] = []
         for archInf in archiveInfos:
             for img in archInf.imgFiles:
-                task4args = [(archInf.archivePath, img.filename,
-                              archInf.tempDir, args.optimizerOptions, self.errorQueue)]
-                res.append(Optimizer.processPool.starmap_async(
-                    convertExtractArchivedImage, task4args))
+                task4args = [
+                    (
+                        archInf.archivePath,
+                        img.filename,
+                        archInf.tempDir,
+                        args.optimizerOptions,
+                        self.errorQueue,
+                    )
+                ]
+                res.append(
+                    self.processPool.starmap_async(
+                        utils.ExtractConvertArchivedImage, task4args
+                    )
+                )
 
-        self.setUiNewTaskStatus(calcProgressBarMaxInt(
-            res), "Converting Images ...")
+        self.setUiNewTaskStatus(
+            utils.calcProgressBarMaxInt(res), "Converting Images ..."
+        )
 
         return res
 
@@ -267,45 +272,58 @@ class Optimizer:
         res = []
         for archInf in archiveInfos:
             task5args = [(archInf.tempDir, archInf.createdTempArchive)]
-            res.append(Optimizer.processPool.starmap_async(
-                ZipUtils.create_archive, task5args, chunksize=chunksize))
+            res.append(
+                self.processPool.starmap_async(
+                    utils.create_archive, task5args, chunksize=chunksize
+                )
+            )
 
-        self.setUiNewTaskStatus(calcProgressBarMaxInt(
-            res), "zipping Archives ...")
+        self.setUiNewTaskStatus(
+            utils.calcProgressBarMaxInt(res), "zipping Archives ..."
+        )
 
         return res
 
-    def setupTask6(self, archiveInfos: list[ArchiveInfo], chunksize: int,restoreBackups:bool):
+    def setupTask6(
+        self, archiveInfos: list[ArchiveInfo], chunksize: int, restoreBackups: bool
+    ):
         res = []
         for archInf in archiveInfos:
             if restoreBackups is True:
-                res.append(Optimizer.processPool.starmap_async(
-                    Optimizer.backupVarFile,
-                    [(archInf.archivePath, self.errorQueue)], chunksize=chunksize
-                ))
+                res.append(
+                    self.processPool.starmap_async(
+                        self.backupVarFile,
+                        [(archInf.archivePath, self.errorQueue)],
+                        chunksize=chunksize,
+                    )
+                )
             else:
-                res.append(Optimizer.processPool.starmap_async(
-                    Optimizer.replaceVarFileWithTempVar,
-                    [(archInf.archivePath, self.errorQueue)], chunksize=chunksize
-                ))
+                res.append(
+                    self.processPool.starmap_async(
+                        self.replaceVarFileWithTempVar,
+                        [(archInf.archivePath, self.errorQueue)],
+                        chunksize=chunksize,
+                    )
+                )
         if restoreBackups is True:
-            self.setUiNewTaskStatus(calcProgressBarMaxInt(
-                res), "Backung Up Original Vars  ...")
+            self.setUiNewTaskStatus(
+                utils.calcProgressBarMaxInt(res), "Backung Up Original Vars  ..."
+            )
         else:
-            self.setUiNewTaskStatus(calcProgressBarMaxInt(
-                res), "Replacing Var Files ...")
+            self.setUiNewTaskStatus(
+                utils.calcProgressBarMaxInt(res), "Replacing Var Files ..."
+            )
         return res
 
     def initProgressBarOnStartup(self, progressdialog: ProgressDialog):
         progressdialog.resetAllProgressbars.emit()
         progressdialog.setTotalProgressRangeMax.emit(1)
-        progressdialog.setTotalProgressDescription.emit(
-            "Loading ...")
+        progressdialog.setTotalProgressDescription.emit("Loading ...")
         progressdialog.setTaskProgresssDescription.emit("Loading ...")
 
-    def postError(self, error: str):
-        self.encounteredErrors += 1
-        self.progressdialog.writeTextLine.emit(error)
+    def postError(error: str):
+        instance = Optimizer.instance
+        instance.progressdialog.writeTextLine.emit(error)
 
     def printErrorsFromQueue(self):
         try:
@@ -317,35 +335,36 @@ class Optimizer:
 
     def updateTaskbyOne(self):
         self.progressdialog.updateTaskProgress.emit(1)
+        self.printErrorsFromQueue()
 
     def updateTotalProgressbyOne(self):
         self.progressdialog.updateTotalProgress.emit(1)
+        self.printErrorsFromQueue()
 
     def setUiNewTaskStatus(self, maxProgressNumber: int, taskDescription: str):
-        self.progressdialog .setTaskProgressRangeMax.emit(maxProgressNumber)
+        self.progressdialog.setTaskProgressRangeMax.emit(maxProgressNumber)
         self.progressdialog.resetTaskProgress.emit()
         self.progressdialog.setTaskProgresssDescription.emit(taskDescription)
+        time.sleep(0.001)
 
-    @ staticmethod
-    def findBackupVarFiles(inputdir):
-        backupfiles = FileUtils.get_all_files_in_dir_by_extension(
-            inputdir, ArchiveInfo.VARBACKUPSUFFIX)
+    def findBackupVarFiles(self, inputdir):
+        backupfiles = utils.get_all_files_in_dir_by_extension(
+            inputdir, ArchiveInfo.VARBACKUPSUFFIX
+        )
         return backupfiles
 
-    @ staticmethod
-    def restoreBackupVars(varBackups: list[Path]):
+    def restoreBackupVars(self, varBackups: list[Path]):
         for vBackup in varBackups:
             if vBackup.with_suffix("").exists():
                 os.remove(vBackup.with_suffix(""))
             vBackup.rename(vBackup.with_suffix(""))
 
-    @ staticmethod
-    def backupVarFile(varfile: Path, errorQueue: multiprocessing.Queue):
+    def backupVarFile(self, varfile: Path, errorQueue: multiprocessing.Queue):
         try:
             varpathSTR = str(varfile)
 
             varPath = varfile
-            backupPath = Path(varpathSTR+ArchiveInfo.VARBACKUPSUFFIX)
+            backupPath = Path(varpathSTR + ArchiveInfo.VARBACKUPSUFFIX)
 
             backupMessagePrefix = "Error Backing up Var File:"
 
@@ -357,22 +376,22 @@ class Optimizer:
                     f"{backupMessagePrefix} The VarFile does not exist anymore - [{str(varPath)}]"
                 )
             if os.path.exists(str(backupPath)):
-                #backupfile already exists, delete backup file
+                # backupfile already exists, delete backup file
                 os.remove(backupPath)
 
-            os.rename(str(varfile),str(backupPath))
+            os.rename(str(varfile), str(backupPath))
         except FileExistsError as e:
-            x=1
+            x = 1
         except Exception as e:
-            errorQueue.put(
-                f"Error Backing up Var File: [{varfile.name}]\n->{str(e)}")
+            errorQueue.put(f"Error Backing up Var File: [{varfile.name}]\n->{str(e)}")
 
-    @ staticmethod
-    def replaceVarFileWithTempVar(varfile:Path, errorQueue:multiprocessing.Queue):
+    def replaceVarFileWithTempVar(
+        self, varfile: Path, errorQueue: multiprocessing.Queue
+    ):
         try:
             varPath = varfile
             varpathSTR = str(varfile)
-            backupPath = Path(varpathSTR+".tempvar")
+            backupPath = Path(varpathSTR + ".tempvar")
 
             backupMessagePrefix = "Error Replacing Var File:"
 
@@ -385,14 +404,50 @@ class Optimizer:
                 )
 
             if os.path.exists(varpathSTR) and os.path.exists(str(backupPath)):
-                #varfile and tempfile exists, delete varfile and remove suffix from tempvar
+                # varfile and tempfile exists, delete varfile and remove suffix from tempvar
                 os.remove(varpathSTR)
                 # backupPath.rename(backupPath.with_suffix(""))
 
         except Exception as e:
             errorQueue.put(
-                f"Error Replacing varfile with tempvar: [{varfile.name}] \n-> [{backupPath.name}]\n->{str(e)}")
+                f"Error Replacing varfile with tempvar: [{varfile.name}] \n-> [{backupPath.name}]\n->{str(e)}"
+            )
 
+    def optimizerSuccessCallback(self, param):
+        # self.updateTaskbyOne()
+        self.updateTotalProgressbyOne()
+
+    def optimizerErrorCallback(self, param):
+        # self.updateTaskbyOne()
+        self.updateTotalProgressbyOne()
+        Optimizer.postError(str(param))
+
+    def optimizeVarFile(args: utils.ArgsDict):
+        vF = args.varfile
+        # scan varFile and index the contents
+        if utils.validateVarFile(vF) is None:
+            Optimizer.postError(f"[{str(vF)}] is not a valid var file!")
+            return
+        archiveinfo = ArchiveInfo(vF, imageConvertOption=args.options)
+        tempZip = archiveinfo.createdTempArchive
+
+        # repack-convert metadata
+        print("metadata: " + str(vF))
+        for metafile in archiveinfo.metaFiles:
+            utils.convertRepackArchivedMetaFile(
+                archive=zipfile.ZipFile(archiveinfo.archivePath, "r"),
+                metafilePath=metafile.filename,
+                targetArchive=archiveinfo.tempZip,
+                errorQueue=args.errorQueue,
+            )
+        # repack jpg files
+
+        # repack-convert other image files
+
+        # rename original file to tempfile
+
+        # rename repack to original file
+        return
 
     def killAllProcesses(self):
         if self.processPool is not None:

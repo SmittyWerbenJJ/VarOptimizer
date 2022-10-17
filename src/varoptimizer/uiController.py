@@ -1,60 +1,28 @@
-import os
-import queue
-from pathlib import Path
-
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from PyQt5.QtWidgets import *
-
-from .eventHook import EventHook
+from .commonImports import *
 from .mainWindow import MainWindow
-from .optimizer import Optimizer
+from .optimizerArgs import OptimizerArgs
 from .progressDialog import ProgressDialog
-from .vamOptimizerUtils import *
-
-# from .Widgets import *
-# from .Widgets.ui_mainWindow import Ui_MainWindow
-
-
-class ThreadWorker(QObject):
-    started = pyqtSignal()
-    finished = pyqtSignal()
-    kill = pyqtSignal()
-
-    def __init__(self, parent=None) -> None:
-        super().__init__(parent)
-        self.optimizerArgs = None
-        self.opt = Optimizer()
-        self.kill.connect(self.opt.killAllProcesses)
-        self.finished.connect(self.quit)
-
-    def run(self):
-        """Long-running task."""
-        if self.optimizerArgs is None:
-            self.finished.emit()
-            return
-        self.opt.optimizeFolder(self.optimizerArgs)
-        self.finished.emit()
-
-    def quit(self):
-        self.kill.emit()
+from .pyqtimports import *
+from .qThreadWorker import ThreadWorker
+from .eventHook import EventHook
+from .Widgets import *
 
 
 class UiController(QObject):
     finished = pyqtSignal()
     progress = pyqtSignal(int)
     backGroundThread: QThread
-    backgroundworker = ThreadWorker()
-    # FIXME: Does Not work on packaged Application. need to find a fix for that
-    iconPathh = str(
-        Path(__file__).parent.parent.parent.joinpath(
-            "img\\icon.ico").resolve().absolute()
-    )
 
-    def __init__(self, ):
+    def __init__(self):
         super(UiController, self).__init__()
+
+        # FIXME: Does Not work on packaged Application. need to find a fix for that
+        self.iconPathh = str(
+            Path(__file__).joinpath("../../../img/icon.ico").resolve().absolute()
+        )
+        self.backgroundworker = ThreadWorker()
         self.cwd = str(Path(__file__).parent)
-        self.workQueue = queue.Queue()
+
         self.onProgressUpdate = EventHook()
         self.optimizerArgs = OptimizerArgs()
 
@@ -70,17 +38,12 @@ class UiController(QObject):
         ui = self.mainWindow.ui
 
         # hook up ui events from main menu objects
-        self.mainWindow.onOpenFolderDialogClicked.connect(
-            self.userSelectNewInputDir)
-        self.mainWindow.onOptimizeButtonClicked .connect(
-            self.showProgressWindow)
-        self.mainWindow.onRestoreBackupToggled .connect(
-            self.userToggleRestoreBackup)
-        self.mainWindow.onInputDirTextChanged .connect(self.setNewFolderPath)
-        self.mainWindow.onResizeImageResChanged .connect(
-            self.setResizeImageResolution)
-        self.mainWindow.onResizeImageToggled .connect(
-            self.setResizeImageEnabled)
+        self.mainWindow.onOpenFolderDialogClicked.connect(self.userSelectNewInputDir)
+        self.mainWindow.onOptimizeButtonClicked.connect(self.showProgressWindow)
+        self.mainWindow.onRestoreBackupToggled.connect(self.userToggleRestoreBackup)
+        self.mainWindow.onInputDirTextChanged.connect(self.setNewFolderPath)
+        self.mainWindow.onResizeImageResChanged.connect(self.setResizeImageResolution)
+        self.mainWindow.onResizeImageToggled.connect(self.setResizeImageEnabled)
         self.mainWindow.onRecursiveToggled.connect(self.setRecursive)
 
         self.setResizeImageResolution(ui.cmb_resizeImg.currentText())
@@ -113,8 +76,7 @@ class UiController(QObject):
         # if self.backGroundThread is None:
 
         self.backGroundThread = QThread()
-        self.backGroundThread.setObjectName(
-            "Optimizer Manager BackgroundThread")
+        self.backGroundThread.setObjectName("Optimizer Manager BackgroundThread")
         self.backgroundworker.optimizerArgs = self.optimizerArgs
         self.backgroundworker.moveToThread(self.backGroundThread)
 
@@ -155,8 +117,7 @@ class UiController(QObject):
             if path.exists():
                 self.optimizerArgs.dir = path
         if setInUI:
-            self.mainWindow.ui.input_folder.setText(
-                str(self.optimizerArgs.dir))
+            self.mainWindow.ui.input_folder.setText(str(self.optimizerArgs.dir))
 
     def setResizeImageEnabled(self, activeState):
         if type(activeState) == int:
