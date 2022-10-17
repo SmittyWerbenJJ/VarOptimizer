@@ -7,7 +7,6 @@ call conda activate ./.env
 echo Packaging Project ...
 pyinstaller ^
 --windowed ^
---onefile ^
 --icon "img\icon.ico" ^
 --name "%name%" ^
 -y ^

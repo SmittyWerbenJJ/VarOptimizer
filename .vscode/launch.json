@@ -4,7 +4,7 @@
             "name": "Python: VamOptimizer",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/src/runme.py",
+            "program": "src/runme.py",
             "console": "integratedTerminal",
             "justMyCode": true
         },
