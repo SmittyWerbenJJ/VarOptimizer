@@ -2,6 +2,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
+
 from .eventHook import EventHook
 from .Widgets import ui_ProgressDialog
 
@@ -11,6 +12,7 @@ class ProgressDialog(QDialog):
     This "window" is a QWidget. If it has no parent, it
     will appear as a free-floating window as we want.
     """
+
     onUpdateTaskProgress_DONTCALL = EventHook()
     onResizeImageToggled = EventHook()
 
@@ -34,7 +36,7 @@ class ProgressDialog(QDialog):
     clearTextBox = QtCore.pyqtSignal()
     onCancel = QtCore.pyqtSignal()
 
-    def __init__(self,iconPath=None, parent=None):
+    def __init__(self, iconPath=None, parent=None):
         super().__init__(parent)
         self.ui = ui_ProgressDialog.Ui_DialogProgress()
         self.ui.setupUi(self)
@@ -71,15 +73,13 @@ class ProgressDialog(QDialog):
         self.setTotalProgress.connect(self.setTotalProgress_DONTCALL)
         self.resetTotalProgress.connect(self.resetTotalProgress_DONTCALL)
         self.updateTotalProgress.connect(self.updateTotalProgress_DONTCALL)
-        self.setTotalProgressDescription.connect(
-            self.setTotalDescription_DONTCALL)
+        self.setTotalProgressDescription.connect(self.setTotalDescription_DONTCALL)
 
         self.setTaskProgressRangeMax.connect(self.setTaskRangeMax_DONTCALL)
         self.setTaskProgress.connect(self.setTaskProgress_DONTCALL)
         self.resetTaskProgress.connect(self.resetTaskProgress_DONTCALL)
         self.updateTaskProgress.connect(self.updateTaskProgress_DONTCALL)
-        self.setTaskProgresssDescription.connect(
-            self.setTaskDescription_DONTCALL)
+        self.setTaskProgresssDescription.connect(self.setTaskDescription_DONTCALL)
 
         self.writeTextLine.connect(self.postError_DONTCALL)
         self.clearTextBox.connect(self.clearTextBox_DONTCALL)
@@ -96,12 +96,14 @@ class ProgressDialog(QDialog):
     def setTotalProgress_DONTCALL(self, value):
         self.ui.progressBar_totalprogress.setValue(value)
 
-    def resetTotalProgress_DONTCALL(self,):
+    def resetTotalProgress_DONTCALL(
+        self,
+    ):
         self.ui.progressBar_totalprogress.setValue(0)
 
     def updateTotalProgress_DONTCALL(self, updateValue):
         currentProgress = self.ui.progressBar_totalprogress.value()
-        self.ui.progressBar_totalprogress.setValue(currentProgress+updateValue)
+        self.ui.progressBar_totalprogress.setValue(currentProgress + updateValue)
         self.updateUI()
 
     def setTotalDescription_DONTCALL(self, desc):
@@ -115,12 +117,14 @@ class ProgressDialog(QDialog):
     def setTaskProgress_DONTCALL(self, value):
         self.ui.progressBar_taskProgress.setValue(value)
 
-    def resetTaskProgress_DONTCALL(self,):
+    def resetTaskProgress_DONTCALL(
+        self,
+    ):
         self.ui.progressBar_taskProgress.setValue(0)
 
     def updateTaskProgress_DONTCALL(self, updateValue):
         currentProgress = self.ui.progressBar_taskProgress.value()
-        self.ui.progressBar_taskProgress.setValue(currentProgress+updateValue)
+        self.ui.progressBar_taskProgress.setValue(currentProgress + updateValue)
         self.updateUI()
 
     def setTaskDescription_DONTCALL(self, desc):
@@ -131,7 +135,7 @@ class ProgressDialog(QDialog):
         self.setTotalProgressRangeMax.emit(100)
         self.setTaskProgressRangeMax.emit(100)
         self.setTotalProgressDescription.emit("Total Progress ...")
-        self. setTaskProgresssDescription.emit("...")
+        self.setTaskProgresssDescription.emit("...")
         self.resetTotalProgress.emit()
         self.resetTaskProgress.emit()
         self.updateUI()
@@ -140,7 +144,7 @@ class ProgressDialog(QDialog):
         self.ui.textbox.clear()
 
     def postError_DONTCALL(self, text):
-        self.ui.textbox.append(text+"\n")
+        self.ui.textbox.append(text + "\n")
 
     def updateUI(self):
         QApplication.processEvents()
