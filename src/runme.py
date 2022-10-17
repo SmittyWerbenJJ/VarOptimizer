@@ -1,4 +1,7 @@
-from varoptimizer.App import main
+# from varoptimizer.App import main
+# from __future__ import annotations
 
-if __name__ == '__main__':
-    main()
+import varoptimizer.App as App
+
+if __name__ == "__main__":
+    App.main()
